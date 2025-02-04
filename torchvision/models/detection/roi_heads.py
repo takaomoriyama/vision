@@ -751,7 +751,7 @@ class RoIHeads(nn.Module):
                     if not t["keypoints"].dtype == torch.float32:
                         raise TypeError(f"target keypoints must of float type, instead got {t['keypoints'].dtype}")
 
-        if self.training:
+        if targets is not None:
             proposals, matched_idxs, labels, regression_targets = self.select_training_samples(proposals, targets)
         else:
             labels = None
@@ -764,24 +764,19 @@ class RoIHeads(nn.Module):
 
         result: List[Dict[str, torch.Tensor]] = []
         losses = {}
-        if self.training:
-            if labels is None:
-                raise ValueError("labels cannot be None")
-            if regression_targets is None:
-                raise ValueError("regression_targets cannot be None")
+        if labels is not None and regression_targets is not None:
             loss_classifier, loss_box_reg = fastrcnn_loss(class_logits, box_regression, labels, regression_targets)
             losses = {"loss_classifier": loss_classifier, "loss_box_reg": loss_box_reg}
-        else:
-            boxes, scores, labels = self.postprocess_detections(class_logits, box_regression, proposals, image_shapes)
-            num_images = len(boxes)
-            for i in range(num_images):
-                result.append(
-                    {
-                        "boxes": boxes[i],
-                        "labels": labels[i],
-                        "scores": scores[i],
-                    }
-                )
+        boxes, scores, labels = self.postprocess_detections(class_logits, box_regression, proposals, image_shapes)
+        num_images = len(boxes)
+        for i in range(num_images):
+            result.append(
+                {
+                    "boxes": boxes[i],
+                    "labels": labels[i],
+                    "scores": scores[i],
+                }
+            )
 
         if self.has_mask():
             mask_proposals = [p["boxes"] for p in result]
